@@ -2,18 +2,23 @@ import java.util.ArrayList;
 import java.util.Random;
 
 public class Subscriber {
+	
+	int actionAmount = 10;
 	String[] actionPossibilities = {"Move", "Move", "Move", "Stand", "Stand", "Stand", "Stand", "Stand", "Stand", "Stand"};
-	int[] multiply = {0,1};
 	double distlimit = 0.20;
+	
+	int[] multiply = {0,1};
 	double nscoord;
 	double wecoord;
 	int id;
 	int load;
 	ArrayList<ArrayList<Object>> actions;
 	//creates the actions that the subscriber will take 
+	
+	
 	public ArrayList<ArrayList<Object>> generateActions(){
 		ArrayList<ArrayList<Object>> actionArray = new ArrayList<ArrayList<Object>>();
-		for(int i = 0; i<10;i++) {
+		for(int i = 0; i<actionAmount;i++) {
 			int rnd = new Random().nextInt(actionPossibilities.length);
 			switch(actionPossibilities[rnd]) {
 			case "Move":
@@ -41,6 +46,21 @@ public class Subscriber {
 		}
 		return actionArray;
 	}
+	
+	
+	public Subscriber performAction (Subscriber a) {
+		for(int i = 0; i<actionAmount;i++) {
+			String action = String.valueOf(a.actions.get(0).get(0));
+			switch(action) {
+			case "Move":
+				break;
+			default:
+				break;
+			}
+		}
+		return a;
+	}
+	
 	//Constructor for Subscriber
 	public Subscriber(double cor1, double cor2, int identifier, int load){
 		this.nscoord = cor1;

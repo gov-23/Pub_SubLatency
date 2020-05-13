@@ -28,6 +28,10 @@ public class Broker {
 		this.sub_lat = new TreeMap<Integer, Subscriber>();
 		System.out.println("Broker with id " + this.id + " created"+", Coordinates are "+this.nscoord +", "+ this.wecoord);
 	}
+	//checks whether a user has reached his latency threshold to be transferred
+	public Boolean checkLatencyThreshold(Subscriber a) {
+		return false;
+	}
 	public Broker AssignSubscribertoBroker(Subscriber a, Broker b) {
 		b.sub_ids.put(a.id, a);
 		b.sub_thresh.put(a.id, a);
