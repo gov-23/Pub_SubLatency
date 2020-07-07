@@ -2,16 +2,20 @@ import java.util.ArrayList;
 import java.util.Random;
 
 public class Subscriber {
+	public static long randomSeed = 12;
+	public static Random rand = new Random(randomSeed);
+	
 	
 	int actionAmount = 10;
 	String[] actionPossibilities = {"Move", "Move", "Move", "Stand", "Stand", "Stand", "Stand", "Stand", "Stand", "Stand"};
 	double distlimit = 0.20;
-	
+	//double threshold= 80;
 	int[] multiply = {0,1};
 	double nscoord;
 	double wecoord;
 	int id;
 	int load;
+	int unhappiness;
 	ArrayList<ArrayList<Object>> actions;
 	//creates the actions that the subscriber will take 
 	
@@ -19,16 +23,15 @@ public class Subscriber {
 	public ArrayList<ArrayList<Object>> generateActions(){
 		ArrayList<ArrayList<Object>> actionArray = new ArrayList<ArrayList<Object>>();
 		for(int i = 0; i<actionAmount;i++) {
-			int rnd = new Random().nextInt(actionPossibilities.length);
+			int rnd = rand.nextInt(actionPossibilities.length);
 			switch(actionPossibilities[rnd]) {
 			case "Move":
-				Random r = new Random();
 				//create random north-south distance
-				double randomdist = 0+distlimit*r.nextDouble();
-				randomdist *= multiply[new Random().nextInt(multiply.length)];
+				double randomdist = 0+distlimit*rand.nextDouble();
+				randomdist *= multiply[rand.nextInt(multiply.length)];
 				double distlim2 = distlimit - Math.abs(randomdist);
-				double randomdist2 = 0+distlim2*r.nextDouble();
-				randomdist2 *= multiply[new Random().nextInt(multiply.length)];
+				double randomdist2 = 0+distlim2*rand.nextDouble();
+				randomdist2 *= multiply[rand.nextInt(multiply.length)];
 				ArrayList<Object> action = new ArrayList<Object>();
 				action.add(actionPossibilities[rnd]);
 				action.add(randomdist);
@@ -44,21 +47,23 @@ public class Subscriber {
 			}
 
 		}
+		System.out.println(actionArray);
 		return actionArray;
 	}
 	
-	
-	public Subscriber performAction (Subscriber a) {
+	//implement load change during course of execution
+	public void performAction () {
 		for(int i = 0; i<actionAmount;i++) {
-			String action = String.valueOf(a.actions.get(0).get(0));
+			String action = String.valueOf(this.actions.get(i).get(0));
 			switch(action) {
 			case "Move":
+				this.nscoord += Double.parseDouble((this.actions.get(i).get(1).toString())); 
+				this.wecoord += Double.parseDouble((this.actions.get(i).get(2).toString())); 
 				break;
 			default:
 				break;
 			}
 		}
-		return a;
 	}
 	
 	//Constructor for Subscriber
@@ -68,7 +73,7 @@ public class Subscriber {
 		this.id = identifier;
 		this.load = load;
 		this.actions = generateActions();
-		System.out.println("Subscriber with id " + this.id + " created"+", Coordinates are "+this.nscoord +", "+ this.wecoord+", Load is "+this.load);
-		System.out.println("Subscriber id "+this.id+ " has the following actions"+ this.actions);
+		//System.out.println("Subscriber with id " + this.id + " created"+", Coordinates are "+this.nscoord +", "+ this.wecoord+", Load is "+this.load);
+		//System.out.println("Subscriber id "+this.id+ " has the following actions"+ this.actions);
 	}
 }
