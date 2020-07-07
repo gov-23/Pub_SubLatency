@@ -12,11 +12,11 @@ public class Broker {
 	double nscoord;
 	double wecoord;
 	int unhappiness;
-	int[] unhappinessArray = new int[10];
+	int[] unhappinessArray = new int[BCS.turnLimit];
 	String brokername;
 	int id;
 	int load;
-	int[] loadArray = new int[10];
+	int[] loadArray = new int[BCS.turnLimit];
 	int mean_lat;
 	int num_sub;
 	Map<Integer, double[]> sub_loc;
@@ -48,13 +48,25 @@ public class Broker {
 	public void calculateLatencyDeviation() {
 		
 	}
-	public Subscriber getHeaviestSubscriber() {
-		double biggestLoad =0;
-		int id = 0;
-		for (Integer key : sub_load.keySet()) {
-			if(sub_load.get(key) > biggestLoad) {
-				biggestLoad = sub_load.get(key);
-				id = key;
+	public Subscriber getHeaviestSubscriber(int count) {
+		ArrayList<Integer> keysToIgnore = new ArrayList<>();
+		while(count >= 0) {
+			double biggestLoad =0;
+			int id = 0;
+			for (Integer key : sub_load.keySet()) {
+				if(!keysToIgnore.contains(key)) {
+					if(sub_load.get(key) > biggestLoad) {
+						biggestLoad = sub_load.get(key);
+						id = key;
+					}
+				}
+			}
+			if(count == 0) {
+				return sub_ids.get(id);
+			}else {
+				keysToIgnore.add(id);
+				count--;
+				
 			}
 		}
 		return sub_ids.get(id);
@@ -114,7 +126,7 @@ public class Broker {
 		b.load += a.load;
 		b.mean_lat = b.sub_lat.values().stream().reduce(0, Integer::sum)/b.sub_lat.values().size();
 		//b.sub_loc.compute(key, remappingFunction)
-		System.out.println("Broker "+b.id+" took user with id "+a.id+", Subscriber has a latency of "+b.sub_lat.get(a.id)+"ms"+" and a unhappiness factor of "+a.unhappiness);
+		//System.out.println("Broker "+b.id+" took user with id "+a.id+", Subscriber has a latency of "+b.sub_lat.get(a.id)+"ms"+" and a unhappiness factor of "+a.unhappiness +" and load : "+ a.load);
 		return b;
 	}
 	

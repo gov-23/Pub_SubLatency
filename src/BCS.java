@@ -24,23 +24,25 @@ public class BCS {
 		
 	}
 	//--------------------------------------------
-	static InitialDeployment ip = InitialDeployment.NRB;
-	static ShuffleMethod sm = ShuffleMethod.SmLat;
+	static InitialDeployment ip = InitialDeployment.RR;
+	static ShuffleMethod sm = ShuffleMethod.HeavSub;
 	public static double nsrangeMin = -90;
 	public static double nsrangeMax = 90;
 	public static double werangeMin = -180;
 	public static double werangeMax = 180;
-	public static int subscriber_amount = 100;
-	public static int broker_amount = 5;
+	public static int subscriberAmount = 100;
+	public static int brokerAmount = 5;
 	public static double latencyShuffleThreshold;
 	public static double loadShuffleThreshold;
 	public static double latPerKM = 0.021048134571484346;
 	public static long randomSeed = 12;
+	public static long randomSeed2 = 0;
 	public static Random rand = new Random(randomSeed);
 	public static Map<String, Broker> brokerlist = new TreeMap<String,Broker>();
     public static Map<String, Subscriber> subscriberlist = new TreeMap<String, Subscriber>();
+    public static Map<Integer, ArrayList<ArrayList<Integer>>> subscriberLoadChanges = new TreeMap<>();
     public static int dMloadLimit = 75;
-    public static int sHloadLimit = 85;
+    public static int sHloadLimit = 95;
     public static int totalLoad = 350;
     public static int loadMin = 1;
     public static int loadMax = 5;
@@ -50,7 +52,7 @@ public class BCS {
     public static int loadDecreaseTurnMax = 6;
     public static int loadIncreaseTurnMin = 1;
     public static int loadIncreaseTurnMax = 3;
-
+    public static Random r  = new Random(randomSeed2);
 	//--------------------------------------------
 	
 	//calculate "happiness" according to latency diff to optimal broker
@@ -87,6 +89,26 @@ public class BCS {
 		double smallest = Math.min(dist0, Math.min(dist0, Math.min(dist1, Math.min(dist2, Math.min(dist3, dist4)))));
 		int smallestLat = distanceToLatency(smallest);
 		return currentMS-smallestLat;
+	}
+	public static Broker calculateLowestLoad() {
+		int index = 0;
+		int currentLoadMin = Integer.MAX_VALUE;
+		for(int i = 0; i < brokerlist.size();i++) {
+			Broker b = brokerlist.get("b"+Integer.toString(i));
+			if(b.load < currentLoadMin) {
+				index = i; 
+				currentLoadMin = b.load;
+			}
+		}
+		return brokerlist.get("b"+Integer.toString(index));
+	}
+	public static int calculateTotalLoad() {
+		int totalLoad = 0;
+		for(int i = 0; i < brokerlist.size();i++) {
+			Broker b = brokerlist.get("b"+Integer.toString(i));
+			totalLoad+= b.load;
+		}
+		return totalLoad;
 	}
 	public static Broker calculateNearestBroker(Subscriber a, ArrayList<String> brokersToIgnore) {
 		double lat1 = a.nscoord;
@@ -190,7 +212,45 @@ public class BCS {
 		return brokerlist.get("b0");
 	}
 	public static void increaseDataRates() {
-		
+		int subMax = subscriberAmount;
+		int count = 0;
+		ArrayList<Integer> subscribersChosen = new ArrayList<>();
+		while(count <= (subscriberAmount / 4)) {
+			int subscriberValue = r.nextInt(subMax);
+			if(!subscribersChosen.contains(subscriberValue)) {
+				subscribersChosen.add(subscriberValue);
+				count++;
+			}
+		}
+		for(Integer i : subscribersChosen) {
+			int turnToIncrease = turn + r.nextInt(loadIncreaseTurnMax)+loadIncreaseTurnMin;
+			int increaseBy = r.nextInt(loadMax);
+			int turnToDecrease = turn + r.nextInt(loadDecreaseTurnMax)+(loadDecreaseTurnMax-loadDecreaseTurnMin);
+			int decreaseBy = -increaseBy;
+			ArrayList<Integer> increaseTurn = new ArrayList<>();
+			increaseTurn.add(i);
+			increaseTurn.add(increaseBy);
+			ArrayList<Integer> decreaseTurn = new ArrayList<>();
+			decreaseTurn.add(i);
+			decreaseTurn.add(decreaseBy);
+			ArrayList<ArrayList<Integer>> currentValue = new ArrayList<>();
+			if(subscriberLoadChanges.get(turnToIncrease) != null) {
+				currentValue = subscriberLoadChanges.get(turnToIncrease);
+				
+			}
+			currentValue.add(increaseTurn);
+			subscriberLoadChanges.put(turnToIncrease, currentValue);
+			
+			currentValue = new ArrayList<>();
+			if(subscriberLoadChanges.get(turnToDecrease) != null) {
+				currentValue = subscriberLoadChanges.get(turnToDecrease);
+				
+			}
+			currentValue.add(decreaseTurn);
+			subscriberLoadChanges.put(turnToDecrease, currentValue);
+			
+			//calculate turn when it will go up
+		}
 	}
 	//TODO
 	public static Broker AssignSubscriber(Subscriber a, Map<String, Broker> brokerlist, int brokerid) {
@@ -255,8 +315,18 @@ public class BCS {
 		for(int i = 0;i<brokerlist.size();i++) {
 			Broker broker = brokerlist.get("b"+Integer.toString(i));
 			int currentLoad = broker.calculateLoad();
-			if(currentLoad > dMloadLimit) {
-						performLoadDynamicMigration(broker);
+			int count = 0;
+			while(currentLoad > dMloadLimit) {
+						if(count >= broker.sub_load.size()) {
+							break;
+						}
+						performLoadDynamicMigration(broker, count);
+						if(currentLoad == broker.calculateLoad()) {
+							count++;
+							performLoadDynamicMigration(broker,count);
+						}
+						currentLoad = broker.calculateLoad();
+					
 			}
 		}
 	}
@@ -292,6 +362,12 @@ public class BCS {
 			Broker bestBroker = calculateNearestBroker(sub, brokersToIgnore);
 			if(bestBroker.load+sub.load > dMloadLimit) {
 				brokersToIgnore.add(bestBroker.brokername);
+				if(brokersToIgnore.size() >= brokerlist.size()) {
+					Broker b = calculateLowestLoad();
+					assignedToBroker = true;
+					sub.unhappiness = calculateHappiness(sub, brokerlist, b);
+					b.AssignSubscribertoBroker(sub, b);
+				}
 			}else {
 				assignedToBroker = true;
 				sub.unhappiness = calculateHappiness(sub, brokerlist, bestBroker);
@@ -300,15 +376,25 @@ public class BCS {
 		}
 	}
 	//performs load dynamic Migration
-	public static void performLoadDynamicMigration(Broker broker) {
-		Subscriber sub = broker.getHeaviestSubscriber();
+	public static void performLoadDynamicMigration(Broker broker, int count) {
+		Subscriber sub = broker.getHeaviestSubscriber(count);
+		if(sub != null) {
 		broker.removeSubscriber(sub.id);
+		}else {
+			return;
+		}
 		ArrayList<String> brokersToIgnore = new ArrayList<>();
 		boolean assignedToBroker = false;
 		while(assignedToBroker == false) {
 			Broker bestBroker = calculateNearestBroker(sub, brokersToIgnore);
 			if(bestBroker.load+sub.load > dMloadLimit) {
 				brokersToIgnore.add(bestBroker.brokername);
+				if(brokersToIgnore.size() >= brokerlist.size()) {
+					Broker b = calculateLowestLoad();
+					assignedToBroker = true;
+					sub.unhappiness = calculateHappiness(sub, brokerlist, b);
+					b.AssignSubscribertoBroker(sub, b);
+				}
 			}else {
 				assignedToBroker = true;
 				sub.unhappiness = calculateHappiness(sub, brokerlist, bestBroker);
@@ -340,6 +426,12 @@ public class BCS {
 					Broker bestBroker = calculateNearestBroker(currentSub, brokersToIgnore);
 					if(bestBroker.load+currentSub.load > dMloadLimit) {
 						brokersToIgnore.add(bestBroker.brokername);
+						if(brokersToIgnore.size() >= brokerlist.size()) {
+							Broker b = calculateLowestLoad();
+							assignedToBroker = true;
+							currentSub.unhappiness = calculateHappiness(currentSub, brokerlist, b);
+							b.AssignSubscribertoBroker(currentSub, b);
+						}
 					}else {
 						assignedToBroker = true;
 						currentSub.unhappiness = calculateHappiness(currentSub, brokerlist, bestBroker);
@@ -384,6 +476,12 @@ public class BCS {
 					Broker bestBroker = calculateNearestBroker(currentSub, brokersToIgnore);
 					if(bestBroker.load+currentSub.load > dMloadLimit) {
 						brokersToIgnore.add(bestBroker.brokername);
+						if(brokersToIgnore.size() == brokerlist.size()) {
+							Broker b = calculateLowestLoad();
+							assignedToBroker = true;
+							currentSub.unhappiness = calculateHappiness(currentSub, brokerlist, b);
+							b.AssignSubscribertoBroker(currentSub, b);
+						}
 					}else {
 						assignedToBroker = true;
 						currentSub.unhappiness = calculateHappiness(currentSub, brokerlist, bestBroker);
@@ -419,6 +517,12 @@ public class BCS {
 					Broker bestBroker = calculateNearestBroker(currentSub, brokersToIgnore);
 					if(bestBroker.load+currentSub.load > dMloadLimit) {
 						brokersToIgnore.add(bestBroker.brokername);
+						if(brokersToIgnore.size() == brokerlist.size()) {
+							Broker b = calculateLowestLoad();
+							assignedToBroker = true;
+							currentSub.unhappiness = calculateHappiness(currentSub, brokerlist, b);
+							b.AssignSubscribertoBroker(currentSub, b);
+						}
 					}else {
 						assignedToBroker = true;
 						currentSub.unhappiness = calculateHappiness(currentSub, brokerlist, bestBroker);
@@ -458,6 +562,12 @@ public class BCS {
 					Broker bestBroker = calculateNearestBroker(currentSub, brokersToIgnore);
 					if(loadstates.get(bestBroker.brokername)+currentSub.load > dMloadLimit) {
 						brokersToIgnore.add(bestBroker.brokername);
+						if(brokersToIgnore.size() == brokerlist.size()) {
+							Broker b = calculateLowestLoad();
+							assignedToBroker = true;
+							loadstates.put(b.brokername, loadstates.get(b.brokername)+currentSub.load);
+							newUnhappiness += calculateHappiness(currentSub, brokerlist, b);
+						}
 					}else {
 						assignedToBroker = true;
 						loadstates.put(bestBroker.brokername, loadstates.get(bestBroker.brokername)+currentSub.load);
@@ -473,6 +583,7 @@ public class BCS {
 			//PRIO: Find the subscribers where the difference between its best and second-best broker is the biggest and put these in a a list. 
 		case PRIO: 
 			double[] priorities = new double[subscriberlist.size()];
+			
 			for(int i = 0;i<subscriberlist.size();i++) {
 				String subname = "s" +Integer.toString(i);
 				Subscriber sub = subscriberlist.get(subname);
@@ -504,6 +615,12 @@ public class BCS {
 					Broker bestBroker = calculateNearestBroker(currentSub, brokersToIgnore);
 					if(loadstates.get(bestBroker.brokername)+currentSub.load > dMloadLimit) {
 						brokersToIgnore.add(bestBroker.brokername);
+						if(brokersToIgnore.size() == brokerlist.size()) {
+							Broker b = calculateLowestLoad();
+							assignedToBroker = true;
+							loadstates.put(b.brokername, loadstates.get(b.brokername)+currentSub.load);
+							newUnhappiness += calculateHappiness(currentSub, brokerlist, b);
+						}
 					}else {
 						assignedToBroker = true;
 						loadstates.put(bestBroker.brokername, loadstates.get(bestBroker.brokername)+currentSub.load);
@@ -541,6 +658,12 @@ public class BCS {
 					Broker bestBroker = calculateNearestBroker(currentSub, brokersToIgnore);
 					if(loadstates.get(bestBroker.brokername)+currentSub.load > dMloadLimit) {
 						brokersToIgnore.add(bestBroker.brokername);
+						if(brokersToIgnore.size() == brokerlist.size()) {
+							Broker b = calculateLowestLoad();
+							assignedToBroker = true;
+							loadstates.put(b.brokername, loadstates.get(b.brokername)+currentSub.load);
+							newUnhappiness += calculateHappiness(currentSub, brokerlist, b);
+						}
 					}else {
 						assignedToBroker = true;
 						loadstates.put(bestBroker.brokername, loadstates.get(bestBroker.brokername)+currentSub.load);
@@ -557,7 +680,7 @@ public class BCS {
 		}
 		//if shuffle is better than current configuration by 20%
 		System.out.println("New theoretical Happiness: "+ newUnhappiness);
-		if(0.8*totalUnhappiness > newUnhappiness) {
+		if(totalUnhappiness > newUnhappiness) {
 			System.out.println("Shuffle will be performed");
 			performShuffle();
 			
@@ -616,6 +739,7 @@ public class BCS {
 		System.out.println("B2 Amount of subscribers on Broker :"+brokerlist.get("b2").sub_ids.size()+", Collective Unhappiness : "+calculateCollectiveUnhappiness(brokerlist.get("b2"), turn)+", Collective Load : "+brokerlist.get("b2").load);
 		System.out.println("B3 Amount of subscribers on Broker :"+brokerlist.get("b3").sub_ids.size()+", Collective Unhappiness : "+calculateCollectiveUnhappiness(brokerlist.get("b3"), turn)+", Collective Load : "+brokerlist.get("b3").load);
 		System.out.println("B4 Amount of subscribers on Broker :"+brokerlist.get("b4").sub_ids.size()+", Collective Unhappiness : "+calculateCollectiveUnhappiness(brokerlist.get("b4"), turn)+", Collective Load : "+brokerlist.get("b4").load);
+		System.out.println("Total system load: " + calculateTotalLoad());
 		SaveGraphData();
 	}
 	//Evaluate graph data with python, prob. seaborn is best
@@ -625,6 +749,27 @@ public class BCS {
 			Broker broker = brokerlist.get(brokername);
 			broker.unhappinessArray[turn] = broker.unhappiness;
 			broker.loadArray[turn] = broker.load;
+		}
+	}
+	
+	public static void UpdateLoadStates() {
+		ArrayList<ArrayList<Integer>> updates = new ArrayList<>();
+		if(subscriberLoadChanges.get(turn) != null) {
+			for(ArrayList<Integer> updateAction : subscriberLoadChanges.get(turn)) {
+				Subscriber sub = subscriberlist.get("s"+ Integer.toString(updateAction.get(0)));
+				sub.load += updateAction.get(1);
+				updateBroker(sub.id, sub.load);
+			}
+		}
+		
+	}
+	public static void updateBroker(int id, int load) {
+		for(int i = 0; i< brokerlist.size();i++) {
+			Broker broker = brokerlist.get("b"+Integer.toString(i));
+			if(broker.sub_load.get(id) != null){
+				broker.sub_load.put(id, load);
+				broker.calculateLoad();
+			}
 		}
 	}
 	public static void main(String[] args) {
@@ -639,7 +784,7 @@ public class BCS {
         brokerlist.put("b4", new Broker(-45,-45,4));
         //Create all Subscribers with variable locations
         int brokerid = 0;
-        for(int i =0; i<subscriber_amount;i++) {
+        for(int i =0; i<subscriberAmount;i++) {
         	randomNSCoord = nsrangeMin + (nsrangeMax - nsrangeMin) * rand.nextDouble();
         	randomWECoord = werangeMin + (werangeMax - werangeMin) * rand.nextDouble(); 	
         	randomLoad = rand.nextInt(loadMax-loadMin) + loadMin;
@@ -663,13 +808,14 @@ public class BCS {
         
         System.out.println("Starting Simulation...");
         while(turn < turnLimit) {
+        	UpdateLoadStates();
+        	performActions();
         	System.out.println("Turn : "+ turn);
         	//every turn except first
         	//increase load of 1/4 of subscribers, which are decreased to their original value 4-6 turns later.
         	if(turn > 0) {
         		increaseDataRates();
         	}
-        	performActions();
         	checkThresholds();
         	printStats();     	
         	try {
@@ -680,7 +826,10 @@ public class BCS {
 			}
         	turn++;
         }
-        
+        for(Map.Entry<Integer, ArrayList<ArrayList<Integer>>> entry: subscriberLoadChanges.entrySet()) {
+        	System.out.println(entry.getKey());
+        	System.out.println(entry.getValue());
+        }
         
 	}
 	
