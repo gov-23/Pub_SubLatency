@@ -16,6 +16,7 @@ public class Subscriber {
 	int id;
 	int load;
 	int unhappiness;
+	int factor;
 	ArrayList<ArrayList<Object>> actions;
 	//creates the actions that the subscriber will take 
 	
@@ -47,7 +48,6 @@ public class Subscriber {
 			}
 
 		}
-		System.out.println(actionArray);
 		return actionArray;
 	}
 	

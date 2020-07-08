@@ -25,7 +25,7 @@ public class BCS {
 	}
 	//--------------------------------------------
 	static InitialDeployment ip = InitialDeployment.RR;
-	static ShuffleMethod sm = ShuffleMethod.HeavSub;
+	static ShuffleMethod sm = ShuffleMethod.PRIO;
 	public static double nsrangeMin = -90;
 	public static double nsrangeMax = 90;
 	public static double werangeMin = -180;
@@ -330,31 +330,59 @@ public class BCS {
 			}
 		}
 	}
+	
+	//checks whether the latency threshold for Dynamic Migration is reached
+	public static void checkBrokerLatencyDMThreshold() {
+		for(int i = 0;i<brokerlist.size();i++) {
+			Broker broker = brokerlist.get("b"+Integer.toString(i));
+			broker.calculateLatency();
+			Map<Integer,Integer> sub_threshCopy = new TreeMap<>();
+			sub_threshCopy.putAll(broker.sub_thresh);
+			for(Map.Entry<Integer,Integer> brokerSubs: sub_threshCopy.entrySet()) {
+				int subID = brokerSubs.getKey();
+				int subValue = brokerSubs.getValue();
+				Subscriber sub = subscriberlist.get("s"+Integer.toString(subID));
+				//if Latency is y times greater than the mean latency
+				if(broker.sub_lat.get(subID)> broker.mean_lat* broker.sub_thresh.get(subID)) {
+					boolean status = performLatencyDynamicMigration(broker, sub);
+					if(!status) {
+						System.out.println("No better broker was found, increase threshold");
+						broker.sub_thresh.put(subID, subValue+1);
+					}
+				}
+			}
+		}
+	}
+	
 	//checks whether the latency threshold for shuffling is reached
-	public static void checkBrokerLoadShuffleThreshold() {
+	public static boolean checkBrokerLoadShuffleThreshold() {
 		for(int i = 0;i<brokerlist.size();i++) {
 			Broker broker = brokerlist.get("b"+Integer.toString(i));
 			int currentLoad = broker.calculateLoad();
 			if(currentLoad > sHloadLimit) {
 				performShuffle();
-				break;
+				return true;
 			}
 		}
+		return false;
 	}
 	//checks whether the latency threshold for shuffling is reached
 	//maybe pseudoshuffle to check if shuffle creates an improvement
-	public static void checkBrokerLatencyShuffleThreshold() {
+	public static boolean checkBrokerLatencyShuffleThreshold() {
 		//checks if shuffling would create a better result than the current happiness value
-		performPseudoShuffle();
+		boolean shuffle = performPseudoShuffle();
+		if(shuffle == true) {
+			return true;
+		}else {
+			return false;
+		}
 	}
 	
 	
 	
 	
 	//offload a worse latency subscriber to another broker
-	public static void performLatencyDynamicMigration(Integer id) {
-		Broker broker = brokerlist.get("b"+Integer.toString(id));
-		Subscriber sub = broker.getFarthestSubscriber();
+	public static boolean performLatencyDynamicMigration(Broker broker , Subscriber sub) {
 		broker.removeSubscriber(sub.id);
 		ArrayList<String> brokersToIgnore = new ArrayList<>();
 		boolean assignedToBroker = false;
@@ -367,13 +395,24 @@ public class BCS {
 					assignedToBroker = true;
 					sub.unhappiness = calculateHappiness(sub, brokerlist, b);
 					b.AssignSubscribertoBroker(sub, b);
+					if(broker.id == b.id) {
+						return false;
+					}else {
+						return true;
+					}
 				}
 			}else {
 				assignedToBroker = true;
 				sub.unhappiness = calculateHappiness(sub, brokerlist, bestBroker);
 				bestBroker.AssignSubscribertoBroker(sub, bestBroker);
+				if(broker.id == bestBroker.id) {
+					return false;
+				}else {
+					return true;
+				}
 			}
 		}
+		return true;
 	}
 	//performs load dynamic Migration
 	public static void performLoadDynamicMigration(Broker broker, int count) {
@@ -536,7 +575,7 @@ public class BCS {
 			
 		}
 	}
-	public static void performPseudoShuffle() {
+	public static boolean performPseudoShuffle() {
 		//implement pseudoshuffle to check if there's an improvement
 		int totalUnhappiness = calculateTotalUnhappiness();
 		System.out.println("Current Happiness: "+ totalUnhappiness);
@@ -684,9 +723,10 @@ public class BCS {
 			System.out.println("Shuffle will be performed");
 			performShuffle();
 			
-			return;
+			return true;
 		}
 		System.out.println("Shuffle will not be performed");
+		return false;
 	}
 	//This is a Java implementation of the Haversine method to calculate the distance between two coordinates 
 	//Credit to https://stackoverflow.com/questions/3694380/calculating-distance-between-two-points-using-latitude-longitude
@@ -727,9 +767,17 @@ public class BCS {
 		}
 	}
 	public static void checkThresholds() {
-		checkBrokerLatencyShuffleThreshold();
-		checkBrokerLoadShuffleThreshold();
+		boolean shuffleHappened = false;
+		shuffleHappened = checkBrokerLatencyShuffleThreshold();
+		if(shuffleHappened) {
+			return;
+		}
+		shuffleHappened = checkBrokerLoadShuffleThreshold();
+		if(shuffleHappened) {
+			return;
+		}
 		checkBrokerLoadDMThreshold();
+		checkBrokerLatencyDMThreshold();
 	}
 	
 	
@@ -752,24 +800,35 @@ public class BCS {
 		}
 	}
 	
-	public static void UpdateLoadStates() {
+	public static void updateLoadStates() {
 		ArrayList<ArrayList<Integer>> updates = new ArrayList<>();
 		if(subscriberLoadChanges.get(turn) != null) {
 			for(ArrayList<Integer> updateAction : subscriberLoadChanges.get(turn)) {
 				Subscriber sub = subscriberlist.get("s"+ Integer.toString(updateAction.get(0)));
 				sub.load += updateAction.get(1);
-				updateBroker(sub.id, sub.load);
+				updateBroker(sub.id, sub.load, sub.nscoord, sub.wecoord);
 			}
 		}
 		
 	}
-	public static void updateBroker(int id, int load) {
+	public static void updateBroker(int id, int load, double nscoord, double wecoord) {
+		double [] coords = new double[2];
+		coords[0] = nscoord;
+		coords[1] = wecoord;
 		for(int i = 0; i< brokerlist.size();i++) {
 			Broker broker = brokerlist.get("b"+Integer.toString(i));
 			if(broker.sub_load.get(id) != null){
 				broker.sub_load.put(id, load);
 				broker.calculateLoad();
 			}
+			if(broker.sub_loc.get(id) != null) {
+				broker.sub_loc.put(id, coords);
+				broker.sub_lat.put(id, (int)Math.round(distance(nscoord, broker.nscoord, wecoord, broker.wecoord)));
+				broker.calculateLatency();
+				Subscriber s = subscriberlist.get("s"+Integer.toString(id));
+				s.unhappiness = calculateHappiness(s, brokerlist, broker);
+			}
+			
 		}
 	}
 	public static void main(String[] args) {
@@ -808,8 +867,8 @@ public class BCS {
         
         System.out.println("Starting Simulation...");
         while(turn < turnLimit) {
-        	UpdateLoadStates();
         	performActions();
+        	updateLoadStates();
         	System.out.println("Turn : "+ turn);
         	//every turn except first
         	//increase load of 1/4 of subscribers, which are decreased to their original value 4-6 turns later.
@@ -825,10 +884,6 @@ public class BCS {
 				e.printStackTrace();
 			}
         	turn++;
-        }
-        for(Map.Entry<Integer, ArrayList<ArrayList<Integer>>> entry: subscriberLoadChanges.entrySet()) {
-        	System.out.println(entry.getKey());
-        	System.out.println(entry.getValue());
         }
         
 	}

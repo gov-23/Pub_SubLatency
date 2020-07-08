@@ -8,7 +8,7 @@ import javax.swing.text.html.HTMLDocument.Iterator;
 
 public class Broker {
 	double latPerKM = 0.021048134571484346;
-	double latencyFactor = 2;
+	int latencyFactor = 2;
 	double nscoord;
 	double wecoord;
 	int unhappiness;
@@ -21,10 +21,13 @@ public class Broker {
 	int num_sub;
 	Map<Integer, double[]> sub_loc;
 	Map<Integer, Subscriber> sub_ids;
-	Map<Integer, Double> sub_thresh;
+	Map<Integer, Integer> sub_thresh;
 	Map<Integer, Integer> sub_load;
 	Map<Integer, Integer> sub_lat;
 	
+	public void updateSubscriberStats() {
+		
+	}
 	
 	public void removeAllSubscribers() {
 		this.sub_ids.clear();
@@ -44,6 +47,9 @@ public class Broker {
 	public int calculateLoad() {
 		//courtesy of https://stackoverflow.com/questions/30089469/how-to-sum-values-in-a-map-with-a-stream
 		return sub_load.values().stream().reduce(0, Integer::sum);
+	}
+	public void calculateLatency() {
+		this.mean_lat = sub_lat.values().stream().reduce(0, Integer::sum)/sub_lat.size();
 	}
 	public void calculateLatencyDeviation() {
 		
@@ -105,19 +111,13 @@ public class Broker {
 		this.brokername= "b"+ Integer.toString(this.id);
 		this.sub_loc = new TreeMap<Integer, double[]>();
 		this.sub_ids = new TreeMap<Integer, Subscriber>();
-		this.sub_thresh = new TreeMap<Integer, Double>();
+		this.sub_thresh = new TreeMap<Integer, Integer>();
 		this.sub_load= new TreeMap<Integer, Integer>();
 		this.sub_lat = new TreeMap<Integer, Integer>();
 		System.out.println("Broker with id " + this.id + " created"+", Coordinates are "+this.nscoord +", "+ this.wecoord);
 	}
 	//checks whether a user has reached his latency threshold to be transferred
-	public void checkLatencyDMThreshold(Subscriber a) {
-		calculateLatencyDeviation();
-		for (Integer key : sub_thresh.keySet()) {
-			
-		}
-		BCS.performLatencyDynamicMigration(id);
-	}
+	
 	public Broker AssignSubscribertoBroker(Subscriber a, Broker b) {
 		b.sub_ids.put(a.id, a);
 		b.sub_thresh.put(a.id, this.latencyFactor);
