@@ -813,7 +813,7 @@ public class BCS {
         	System.out.println("Turn : "+ turn);
         	//every turn except first
         	//increase load of 1/4 of subscribers, which are decreased to their original value 4-6 turns later.
-        	if(turn > 0) {
+        	if(turn > 0 && turn < turnLimit - loadDecreaseTurnMax) {
         		increaseDataRates();
         	}
         	checkThresholds();

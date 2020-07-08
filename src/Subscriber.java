@@ -6,7 +6,7 @@ public class Subscriber {
 	public static Random rand = new Random(randomSeed);
 	
 	
-	int actionAmount = 10;
+	int actionAmount = BCS.turnLimit;
 	String[] actionPossibilities = {"Move", "Move", "Move", "Stand", "Stand", "Stand", "Stand", "Stand", "Stand", "Stand"};
 	double distlimit = 0.20;
 	//double threshold= 80;
