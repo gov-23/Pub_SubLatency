@@ -1,10 +1,16 @@
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.Map;
 import java.util.Random;
 import java.util.TreeMap;
 import java.util.concurrent.ThreadLocalRandom;
+
 
 //Create BCS here, which manages everything
 public class BCS {
@@ -19,40 +25,78 @@ public class BCS {
 	public static enum ShuffleMethod {
 		PRIO,
 		SmLat,
+		GreedyShuffle,
 		HeavSub;
 
 		
 	}
+	
+	public static enum DMMethod {
+		Lat,
+		Load;
+	}
 	//--------------------------------------------
-	static InitialDeployment ip = InitialDeployment.RR;
-	static ShuffleMethod sm = ShuffleMethod.PRIO;
-	public static double nsrangeMin = -90;
-	public static double nsrangeMax = 90;
-	public static double werangeMin = -180;
-	public static double werangeMax = 180;
+	static InitialDeployment ip = InitialDeployment.RND;
+	static ShuffleMethod sm = ShuffleMethod.GreedyShuffle;
+	static DMMethod dm = DMMethod.Lat;
+	//min and max values for coordinates, using Germany's max coordinates and Hamburg, Berlin, Frankfurt, München and Göttingen as Broker locations.
+	public static double nsrangeMin = 47;
+	public static double nsrangeMax = 55;
+	public static double werangeMin = 6;
+	public static double werangeMax = 15;
+	
+	//amount of subscribers and brokers
 	public static int subscriberAmount = 100;
 	public static int brokerAmount = 5;
+	
+	//thresholds currently not implemented 
 	public static double latencyShuffleThreshold;
-	public static double loadShuffleThreshold;
+	
+	//value provided by J.Hasenburg et. al 
 	public static double latPerKM = 0.021048134571484346;
-	public static long randomSeed = 12;
+	
+	//random seeds used to repeat experiment results
+	public static long randomSeed =1;
 	public static long randomSeed2 = 0;
+	
+	
 	public static Random rand = new Random(randomSeed);
+	public static Random r  = new Random(randomSeed2);
+	//maps used to save all brokers and subscribers
 	public static Map<String, Broker> brokerlist = new TreeMap<String,Broker>();
     public static Map<String, Subscriber> subscriberlist = new TreeMap<String, Subscriber>();
+    
+    //saves load changes happening to subscribers
     public static Map<Integer, ArrayList<ArrayList<Integer>>> subscriberLoadChanges = new TreeMap<>();
+    
+    //load limits for DM and SH
     public static int dMloadLimit = 75;
     public static int sHloadLimit = 95;
+    
+    
     public static int totalLoad = 350;
+    
+    //load Max and Min which each subscriber can have at the start of the simulation
     public static int loadMin = 1;
-    public static int loadMax = 5;
+    public static int loadMax = 3;
+    
+    //turn and turnlimits
     public static int turn = 0;
     public static int turnLimit = 144;
+    
+    //define when the load increase/decresae can happen at the latest/earliest
     public static int loadDecreaseTurnMin = 4;
     public static int loadDecreaseTurnMax = 6;
     public static int loadIncreaseTurnMin = 1;
     public static int loadIncreaseTurnMax = 3;
-    public static Random r  = new Random(randomSeed2);
+    
+    //defines how much the threshold should increase by if a LatDM fails
+    public static int thresholdIncrease = 1;
+    
+    // saves total values for load and total Unhappiness
+    public static double[] unhappinessArray = new double[turnLimit];
+    public static double[] loadArray = new double[turnLimit];
+    
 	//--------------------------------------------
 	
 	//calculate "happiness" according to latency diff to optimal broker
@@ -175,6 +219,21 @@ public class BCS {
 			return brokerlist.get("b3");
 		}
 		return brokerlist.get("b4");
+	}
+	
+	public static Broker calculateSmallestLoadBroker(Subscriber currentSub, ArrayList<String> brokersToIgnore) {
+		int index = 0;
+		int minLoad = Integer.MAX_VALUE;
+		for(int i =0;i<brokerlist.size();i++) {
+			Broker broker = brokerlist.get("b"+Integer.toString(i));
+			if(!brokersToIgnore.contains(broker.brokername)) {
+				if(broker.load < minLoad) {
+					index = i; 
+					minLoad = broker.load;
+				}
+			}
+		}
+		return brokerlist.get("b"+Integer.toString(index));
 	}
 	public static Broker initialAssignSubscriber(Subscriber a, Map<String, Broker> brokerlist, int brokerid) {
 		switch(ip) {
@@ -347,7 +406,7 @@ public class BCS {
 					boolean status = performLatencyDynamicMigration(broker, sub);
 					if(!status) {
 						System.out.println("No better broker was found, increase threshold");
-						broker.sub_thresh.put(subID, subValue+1);
+						broker.sub_thresh.put(subID, subValue+thresholdIncrease);
 					}
 				}
 			}
@@ -425,8 +484,14 @@ public class BCS {
 		ArrayList<String> brokersToIgnore = new ArrayList<>();
 		boolean assignedToBroker = false;
 		while(assignedToBroker == false) {
-			Broker bestBroker = calculateNearestBroker(sub, brokersToIgnore);
-			if(bestBroker.load+sub.load > dMloadLimit) {
+			Broker bestBroker;
+			if(dm == DMMethod.Lat) {
+				bestBroker = calculateNearestBroker(sub, brokersToIgnore);
+			}
+			else {
+				bestBroker = calculateSmallestLoadBroker(sub,brokersToIgnore);
+			}
+			if(bestBroker.load+sub.load > dMloadLimit && bestBroker.load + sub.load > broker.load + sub.load) {
 				brokersToIgnore.add(bestBroker.brokername);
 				if(brokersToIgnore.size() >= brokerlist.size()) {
 					Broker b = calculateLowestLoad();
@@ -572,12 +637,55 @@ public class BCS {
 			//now assign the subscribers with the best latencies first
 			}
 			break;
-			
+		case GreedyShuffle:
+			System.out.println("Greedy Shuffle");
+			int[] loadStates = new int[subscriberlist.size()];
+			//calculate smallest distance for each subscriber to a broker
+			for(int i = 0;i<subscriberlist.size();i++) {
+				Subscriber sub = subscriberlist.get("s"+ Integer.toString(i));
+				loadStates[i] = sub.load;
+			}
+			int count3 = 0;
+			while(count3 < subscriberlist.size()) {
+				int index = 0;
+				double biggestValue = Integer.MIN_VALUE;
+				for(int i = 0;i<subscriberlist.size();i++) {
+					if (loadStates[i] > biggestValue) {
+						biggestValue = loadStates[i];
+						index = i;
+					}
+				}
+				loadStates[index] = Integer.MIN_VALUE;
+				Subscriber currentSub = subscriberlist.get("s"+Integer.toString(index));
+				boolean assignedToBroker = false;
+				ArrayList<String> brokersToIgnore = new ArrayList<>();
+				while(assignedToBroker == false) {
+					Broker bestBroker = calculateSmallestLoadBroker(currentSub, brokersToIgnore);
+					if(bestBroker.load+currentSub.load > dMloadLimit) {
+						brokersToIgnore.add(bestBroker.brokername);
+						if(brokersToIgnore.size() == brokerlist.size()) {
+							Broker b = calculateLowestLoad();
+							assignedToBroker = true;
+							currentSub.unhappiness = calculateHappiness(currentSub, brokerlist, b);
+							b.AssignSubscribertoBroker(currentSub, b);
+						}
+					}else {
+						assignedToBroker = true;
+						currentSub.unhappiness = calculateHappiness(currentSub, brokerlist, bestBroker);
+						bestBroker.AssignSubscribertoBroker(currentSub, bestBroker);
+					}
+				}
+				count3++;
 		}
+		}
+		System.out.println("Total Unhappiness across all brokers:: "+calculateTotalUnhappiness());
 	}
+	
+
 	public static boolean performPseudoShuffle() {
 		//implement pseudoshuffle to check if there's an improvement
 		int totalUnhappiness = calculateTotalUnhappiness();
+		unhappinessArray[turn] = totalUnhappiness;
 		System.out.println("Current Happiness: "+ totalUnhappiness);
 		int newUnhappiness = 0;
 		Map<String, Integer> loadstates = new TreeMap<>();
@@ -713,6 +821,48 @@ public class BCS {
 				}
 				count2++;
 			}
+		case GreedyShuffle:
+			int[] subLoadStates = new int[subscriberlist.size()];
+			//calculate smallest distance for each subscriber to a broker
+			for(int i = 0;i<subscriberlist.size();i++) {
+				Subscriber sub = subscriberlist.get("s"+ Integer.toString(i));
+				subLoadStates[i] = 0+sub.load;
+			}
+			int count3 = 0;
+			while(count3 < subscriberlist.size()) {
+				int index = 0;
+				double biggestValue = Integer.MIN_VALUE;
+				for(int i = 0;i<subscriberlist.size();i++) {
+					if (subLoadStates[i] > biggestValue) {
+						biggestValue = subLoadStates[i];
+						index = i;
+					}
+				}
+				subLoadStates[index] = Integer.MIN_VALUE;
+				Subscriber currentSub = subscriberlist.get("s"+Integer.toString(index));
+				boolean assignedToBroker = false;
+				ArrayList<String> brokersToIgnore = new ArrayList<>();
+				while(assignedToBroker == false) {
+					Broker bestBroker = calculateSmallestLoadBroker(currentSub, brokersToIgnore);
+					if(loadstates.get(bestBroker.brokername)+currentSub.load > dMloadLimit) {
+						brokersToIgnore.add(bestBroker.brokername);
+						if(brokersToIgnore.size() == brokerlist.size()) {
+							Broker b = calculateLowestLoad();
+							assignedToBroker = true;
+							loadstates.put(b.brokername, loadstates.get(b.brokername)+currentSub.load);
+							newUnhappiness += calculateHappiness(currentSub, brokerlist, b);
+						}
+					}else {
+						assignedToBroker = true;
+						loadstates.put(bestBroker.brokername, loadstates.get(bestBroker.brokername)+currentSub.load);
+						newUnhappiness += calculateHappiness(currentSub, brokerlist, bestBroker);
+						//don't actually assign the user
+						//bestBroker.AssignSubscribertoBroker(currentSub, bestBroker);
+
+					}
+				}
+				count3++;
+		}
 			default:
 				break;
 			
@@ -777,7 +927,10 @@ public class BCS {
 			return;
 		}
 		checkBrokerLoadDMThreshold();
-		checkBrokerLatencyDMThreshold();
+		//If Latency is used as factor in DM
+		if(dm == DMMethod.Lat) {
+			checkBrokerLatencyDMThreshold();
+		}
 	}
 	
 	
@@ -797,7 +950,13 @@ public class BCS {
 			Broker broker = brokerlist.get(brokername);
 			broker.unhappinessArray[turn] = broker.unhappiness;
 			broker.loadArray[turn] = broker.load;
+		if(i == 0) {
+			loadArray[turn] = broker.load;
+		}else {
+			loadArray[turn]+= broker.load;
 		}
+		}
+		
 	}
 	
 	public static void updateLoadStates() {
@@ -831,61 +990,123 @@ public class BCS {
 			
 		}
 	}
+	public static void writeData(String filePath, int id) 
+	{ 
+	  
+	    // first create file object for file placed at location 
+	    // specified by filepath 
+	    File file = new File(filePath); 
+	    Broker broker = brokerlist.get("b"+Integer.toString(id));
+	    
+	    try { 
+	        // create FileWriter object with file as parameter 
+	    	FileWriter outputfile = new FileWriter(file); 
+	    	outputfile.write("Turn,Happiness,Load\n");
+	    	if(id >=0) {
+		        for(int i = 0;i<broker.unhappinessArray.length;i++) {
+		        	outputfile.write(Integer.toString(i)+","+broker.unhappinessArray[i]+","+broker.loadArray[i]+"\n");
+		        }
+		        
+	    	}else {
+	    		for(int i = 0;i<unhappinessArray.length;i++) {
+	    			outputfile.write(Integer.toString(i)+","+unhappinessArray[i]+","+loadArray[i]+"\n");
+	    		}
+	    	}
+	    	outputfile.close();
+	    } 
+	    catch (IOException e) { 
+	        // TODO Auto-generated catch block 
+	        e.printStackTrace(); 
+	    } 
+	} 
+	public static void dataToCSV(long randomSeed) {
+		
+
+		for(int i = 0; i<brokerlist.size();i++) {
+			String filePath = "C:\\Users\\Tim\\eclipse-workspace\\PubSub_Latency\\Logs\\LOW"+ip+"_"+dm+"_"+sm+"Broker"+ Integer.toString(i)+"_Seed_"+Integer.toString((int)randomSeed)+".csv";
+			writeData(filePath, i);
+		}
+		String filePath = "C:\\Users\\Tim\\eclipse-workspace\\PubSub_Latency\\Logs\\LOW"+ip+"_"+dm+"_"+sm+"Brokers Total_Seed_"+Integer.toString((int)randomSeed)+".csv";
+		writeData(filePath,-1);
+	}
+	
+	public static void clearData() {
+		unhappinessArray = new double[turnLimit];
+		loadArray = new double[turnLimit];
+		for(int i =0;i<5;i++) {
+			Broker broker = brokerlist.get("b"+Integer.toString(i));
+			broker.unhappinessArray = new int[turnLimit];
+			broker.loadArray = new int[turnLimit];
+			broker.removeAllSubscribers();
+		}
+		subscriberlist.clear();
+		brokerlist.clear();
+		subscriberLoadChanges.clear();
+		
+	}
 	public static void main(String[] args) {
         System.out.println("System starting...");
         double randomNSCoord;
         double randomWECoord;
         int randomLoad;
-        brokerlist.put("b0", new Broker(0,0,0));
-        brokerlist.put("b1", new Broker(45,45,1));
-        brokerlist.put("b2", new Broker(45,-45,2));
-        brokerlist.put("b3", new Broker(-45,45,3));
-        brokerlist.put("b4", new Broker(-45,-45,4));
+        
         //Create all Subscribers with variable locations
-        int brokerid = 0;
-        for(int i =0; i<subscriberAmount;i++) {
-        	randomNSCoord = nsrangeMin + (nsrangeMax - nsrangeMin) * rand.nextDouble();
-        	randomWECoord = werangeMin + (werangeMax - werangeMin) * rand.nextDouble(); 	
-        	randomLoad = rand.nextInt(loadMax-loadMin) + loadMin;
-        	System.out.println(randomLoad);
-        	String subname = "s"+Integer.toString(i);
-        	subscriberlist.put(subname,new Subscriber (randomNSCoord,randomWECoord,i,randomLoad));
-        	Subscriber a = subscriberlist.get(subname);
-        	
-        	Broker b  = initialAssignSubscriber(a, brokerlist, brokerid);
-        	brokerid+=1;
-        	if(brokerid == 5) {
-        		brokerid =0;
-        	}
-        	a.unhappiness = calculateHappiness(a, brokerlist, b);
-        	System.out.println(a.unhappiness);
-        	b = b.AssignSubscribertoBroker(a, b);
+        for(int p = 1;p<101;p++) {
+        	int brokerid = 0;
+        	brokerlist.put("b0", new Broker(51.54,9.93,0));
+            brokerlist.put("b1", new Broker(52.51,13.40,1));
+            brokerlist.put("b2", new Broker(53.06,8.83,2));
+            brokerlist.put("b3", new Broker(50.11,8.71,3));
+            brokerlist.put("b4", new Broker(48.16,11.60,4));
+        	long randomSeed =p;
+        	Random rand = new Random(randomSeed);
+	        for(int i =0; i<subscriberAmount;i++) {
+	        	randomNSCoord = nsrangeMin + (nsrangeMax - nsrangeMin) * rand.nextDouble();
+	        	randomWECoord = werangeMin + (werangeMax - werangeMin) * rand.nextDouble(); 	
+	        	randomLoad = rand.nextInt(loadMax-loadMin) + loadMin;
+	        	System.out.println(randomLoad);
+	        	String subname = "s"+Integer.toString(i);
+	        	subscriberlist.put(subname,new Subscriber (randomNSCoord,randomWECoord,i,randomLoad));
+	        	Subscriber a = subscriberlist.get(subname);
+	        	
+	        	Broker b  = initialAssignSubscriber(a, brokerlist, brokerid);
+	        	
+	        	brokerid+=1;
+	        	if(brokerid == 5) {
+	        		brokerid =0;
+	        	}
+	        	a.unhappiness = calculateHappiness(a, brokerlist, b);
+	        	System.out.println(a.unhappiness);
+	        	b = b.AssignSubscribertoBroker(a, b);
+	        }
+	        printStats();
+	        checkThresholds();
+	        printStats();
+	        
+	        System.out.println("Starting Simulation...");
+	        while(turn < turnLimit) {
+	        	performActions();
+	        	updateLoadStates();
+	        	System.out.println("Turn : "+ turn);
+	        	//every turn except first
+	        	//increase load of 1/4 of subscribers, which are decreased to their original value 4-6 turns later.
+	        	if(turn > 0 && turn < turnLimit - loadDecreaseTurnMax) {
+	        		increaseDataRates();
+	        	}
+	        	checkThresholds();
+	        	printStats();     	
+	        	try {
+					Thread.sleep(2);
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+	        	turn++;
+	        }
+	        dataToCSV(randomSeed);
+	        clearData();
+	        turn = 0;
         }
-        printStats();
-        checkThresholds();
-        printStats();
-        
-        System.out.println("Starting Simulation...");
-        while(turn < turnLimit) {
-        	performActions();
-        	updateLoadStates();
-        	System.out.println("Turn : "+ turn);
-        	//every turn except first
-        	//increase load of 1/4 of subscribers, which are decreased to their original value 4-6 turns later.
-        	if(turn > 0 && turn < turnLimit - loadDecreaseTurnMax) {
-        		increaseDataRates();
-        	}
-        	checkThresholds();
-        	printStats();     	
-        	try {
-				Thread.sleep(1000);
-			} catch (InterruptedException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-        	turn++;
-        }
-        
 	}
 	
 	
