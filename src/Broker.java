@@ -34,13 +34,15 @@ public class Broker {
 		this.sub_thresh.clear();
 		this.sub_load.clear();
 		this.sub_lat.clear();
-		this.load = calculateLoad();
+		this.sub_loc.clear();
+		this.load = 0;
 	}
 	public void removeSubscriber(Integer id) {
 		this.sub_ids.remove(id);
 		this.sub_thresh.remove(id);
 		this.sub_load.remove(id);
 		this.sub_lat.remove(id);
+		this.sub_loc.remove(id);
 		this.load = calculateLoad();
 	}
 	
@@ -49,7 +51,12 @@ public class Broker {
 		return sub_load.values().stream().reduce(0, Integer::sum);
 	}
 	public void calculateLatency() {
-		this.mean_lat = sub_lat.values().stream().reduce(0, Integer::sum)/sub_lat.size();
+		if(sub_lat.size()>0) {
+			this.mean_lat = sub_lat.values().stream().reduce(0, Integer::sum)/sub_lat.size();
+		}
+		else {
+			this.mean_lat = 0;
+		}
 	}
 	public void calculateLatencyDeviation() {
 		
