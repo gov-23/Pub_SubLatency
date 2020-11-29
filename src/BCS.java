@@ -957,10 +957,6 @@ public class BCS {
 		System.out.println("B3 Amount of subscribers on Broker :"+brokerlist.get("b3").sub_ids.size()+", Collective Unhappiness : "+calculateCollectiveUnhappiness(brokerlist.get("b3"), turn)+", Collective Load : "+brokerlist.get("b3").load);
 		System.out.println("B4 Amount of subscribers on Broker :"+brokerlist.get("b4").sub_ids.size()+", Collective Unhappiness : "+calculateCollectiveUnhappiness(brokerlist.get("b4"), turn)+", Collective Load : "+brokerlist.get("b4").load);
 		System.out.println("Total system load: " + calculateTotalLoad());
-		if(calculateTotalLoad()>500) {
-			System.out.println("DUMBASS");
-			System.exit(1);
-		}
 		SaveGraphData();
 	}
 	//Evaluate graph data with python, prob. seaborn is best
