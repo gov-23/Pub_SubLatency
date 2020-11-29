@@ -36,9 +36,9 @@ public class BCS {
 		Load;
 	}
 	//--------------------------------------------
-	static InitialDeployment ip = InitialDeployment.RND;
-	static ShuffleMethod sm = ShuffleMethod.GreedyShuffle;
-	static DMMethod dm = DMMethod.Lat;
+	static InitialDeployment ip;
+	static ShuffleMethod sm;
+	static DMMethod dm;
 	//min and max values for coordinates, using Germany's max coordinates and Hamburg, Berlin, Frankfurt, München and Göttingen as Broker locations.
 	public static double nsrangeMin = 47;
 	public static double nsrangeMax = 55;
@@ -253,6 +253,18 @@ public class BCS {
 				return brokerlist.get("b4");
 			}
 		case NRB:
+			ArrayList<String> brokersToIgnore = new ArrayList<>();
+			boolean brokerFound = false;
+			while(!brokerFound) {
+				Broker b = calculateNearestBroker(a,brokersToIgnore);
+				if(b.load + a.load<dMloadLimit) {
+					brokerFound = true;
+					return b;
+				}else {
+					brokersToIgnore.add(b.brokername);
+				}
+				
+			}
 			return calculateNearestBroker(a, new ArrayList<String>());
 		case RR:
 			if(brokerid == 0) {
@@ -282,9 +294,9 @@ public class BCS {
 			}
 		}
 		for(Integer i : subscribersChosen) {
-			int turnToIncrease = turn + r.nextInt(loadIncreaseTurnMax)+loadIncreaseTurnMin;
+			int turnToIncrease = turn + r.nextInt(loadIncreaseTurnMax-loadIncreaseTurnMin)+loadIncreaseTurnMin;
 			int increaseBy = r.nextInt(loadMax);
-			int turnToDecrease = turn + r.nextInt(loadDecreaseTurnMax)+(loadDecreaseTurnMax-loadDecreaseTurnMin);
+			int turnToDecrease = turn + r.nextInt(loadDecreaseTurnMax-loadDecreaseTurnMin)+loadDecreaseTurnMin;
 			int decreaseBy = -increaseBy;
 			ArrayList<Integer> increaseTurn = new ArrayList<>();
 			increaseTurn.add(i);
@@ -308,7 +320,7 @@ public class BCS {
 			currentValue.add(decreaseTurn);
 			subscriberLoadChanges.put(turnToDecrease, currentValue);
 			
-			//calculate turn when it will go up
+			
 		}
 	}
 	//TODO
@@ -413,7 +425,7 @@ public class BCS {
 		}
 	}
 	
-	//checks whether the latency threshold for shuffling is reached
+	//checks whether the loadthreshold for shuffling is reached
 	public static boolean checkBrokerLoadShuffleThreshold() {
 		for(int i = 0;i<brokerlist.size();i++) {
 			Broker broker = brokerlist.get("b"+Integer.toString(i));
@@ -477,7 +489,7 @@ public class BCS {
 	public static void performLoadDynamicMigration(Broker broker, int count) {
 		Subscriber sub = broker.getHeaviestSubscriber(count);
 		if(sub != null) {
-		broker.removeSubscriber(sub.id);
+			broker.removeSubscriber(sub.id);
 		}else {
 			return;
 		}
@@ -491,18 +503,22 @@ public class BCS {
 			else {
 				bestBroker = calculateSmallestLoadBroker(sub,brokersToIgnore);
 			}
-			if(bestBroker.load+sub.load > dMloadLimit && bestBroker.load + sub.load > broker.load + sub.load) {
+			if((bestBroker.load+sub.load > dMloadLimit) && (bestBroker.load + sub.load >= broker.load + sub.load)) {
 				brokersToIgnore.add(bestBroker.brokername);
 				if(brokersToIgnore.size() >= brokerlist.size()) {
 					Broker b = calculateLowestLoad();
 					assignedToBroker = true;
 					sub.unhappiness = calculateHappiness(sub, brokerlist, b);
 					b.AssignSubscribertoBroker(sub, b);
+					
 				}
 			}else {
 				assignedToBroker = true;
 				sub.unhappiness = calculateHappiness(sub, brokerlist, bestBroker);
 				bestBroker.AssignSubscribertoBroker(sub, bestBroker);
+				System.out.println("Subscriber load : "+sub.load);
+				System.out.println("TRANSFERS HERE to "+bestBroker.brokername+" from "+ broker.brokername);
+				System.out.println("New broker load: "+bestBroker.calculateLoad());
 			}
 		}
 	}
@@ -941,6 +957,10 @@ public class BCS {
 		System.out.println("B3 Amount of subscribers on Broker :"+brokerlist.get("b3").sub_ids.size()+", Collective Unhappiness : "+calculateCollectiveUnhappiness(brokerlist.get("b3"), turn)+", Collective Load : "+brokerlist.get("b3").load);
 		System.out.println("B4 Amount of subscribers on Broker :"+brokerlist.get("b4").sub_ids.size()+", Collective Unhappiness : "+calculateCollectiveUnhappiness(brokerlist.get("b4"), turn)+", Collective Load : "+brokerlist.get("b4").load);
 		System.out.println("Total system load: " + calculateTotalLoad());
+		if(calculateTotalLoad()>500) {
+			System.out.println("DUMBASS");
+			System.exit(1);
+		}
 		SaveGraphData();
 	}
 	//Evaluate graph data with python, prob. seaborn is best
@@ -1023,10 +1043,10 @@ public class BCS {
 		
 
 		for(int i = 0; i<brokerlist.size();i++) {
-			String filePath = "C:\\Users\\Tim\\eclipse-workspace\\PubSub_Latency\\Logs\\LOW"+ip+"_"+dm+"_"+sm+"Broker"+ Integer.toString(i)+"_Seed_"+Integer.toString((int)randomSeed)+".csv";
+			String filePath = "C:\\Users\\Tim\\eclipse-workspace\\PubSub_Latency\\Logs\\FINALLOW"+ip+"_"+dm+"_"+sm+"Broker"+ Integer.toString(i)+"_Seed_"+Integer.toString((int)randomSeed)+".csv";
 			writeData(filePath, i);
 		}
-		String filePath = "C:\\Users\\Tim\\eclipse-workspace\\PubSub_Latency\\Logs\\LOW"+ip+"_"+dm+"_"+sm+"Brokers Total_Seed_"+Integer.toString((int)randomSeed)+".csv";
+		String filePath = "C:\\Users\\Tim\\eclipse-workspace\\PubSub_Latency\\Logs\\FINALLOW"+ip+"_"+dm+"_"+sm+"Brokers Total_Seed_"+Integer.toString((int)randomSeed)+".csv";
 		writeData(filePath,-1);
 	}
 	
@@ -1051,61 +1071,71 @@ public class BCS {
         int randomLoad;
         
         //Create all Subscribers with variable locations
-        for(int p = 1;p<101;p++) {
-        	int brokerid = 0;
-        	brokerlist.put("b0", new Broker(51.54,9.93,0));
-            brokerlist.put("b1", new Broker(52.51,13.40,1));
-            brokerlist.put("b2", new Broker(53.06,8.83,2));
-            brokerlist.put("b3", new Broker(50.11,8.71,3));
-            brokerlist.put("b4", new Broker(48.16,11.60,4));
-        	long randomSeed =p;
-        	Random rand = new Random(randomSeed);
-	        for(int i =0; i<subscriberAmount;i++) {
-	        	randomNSCoord = nsrangeMin + (nsrangeMax - nsrangeMin) * rand.nextDouble();
-	        	randomWECoord = werangeMin + (werangeMax - werangeMin) * rand.nextDouble(); 	
-	        	randomLoad = rand.nextInt(loadMax-loadMin) + loadMin;
-	        	System.out.println(randomLoad);
-	        	String subname = "s"+Integer.toString(i);
-	        	subscriberlist.put(subname,new Subscriber (randomNSCoord,randomWECoord,i,randomLoad));
-	        	Subscriber a = subscriberlist.get(subname);
-	        	
-	        	Broker b  = initialAssignSubscriber(a, brokerlist, brokerid);
-	        	
-	        	brokerid+=1;
-	        	if(brokerid == 5) {
-	        		brokerid =0;
-	        	}
-	        	a.unhappiness = calculateHappiness(a, brokerlist, b);
-	        	System.out.println(a.unhappiness);
-	        	b = b.AssignSubscribertoBroker(a, b);
-	        }
-	        printStats();
-	        checkThresholds();
-	        printStats();
-	        
-	        System.out.println("Starting Simulation...");
-	        while(turn < turnLimit) {
-	        	performActions();
-	        	updateLoadStates();
-	        	System.out.println("Turn : "+ turn);
-	        	//every turn except first
-	        	//increase load of 1/4 of subscribers, which are decreased to their original value 4-6 turns later.
-	        	if(turn > 0 && turn < turnLimit - loadDecreaseTurnMax) {
-	        		increaseDataRates();
-	        	}
-	        	checkThresholds();
-	        	printStats();     	
-	        	try {
-					Thread.sleep(2);
-				} catch (InterruptedException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
-	        	turn++;
-	        }
-	        dataToCSV(randomSeed);
-	        clearData();
-	        turn = 0;
+        for(InitialDeployment ip2 : InitialDeployment.values()) {
+        	ip = ip2;
+        	for(ShuffleMethod sh : ShuffleMethod.values()){
+        		sm = sh;
+        		for(DMMethod dm2: DMMethod.values()) {
+        			dm = dm2;
+        
+			        for(int p = 1;p<101;p++) {
+			        	int brokerid = 0;
+			        	brokerlist.put("b0", new Broker(51.54,9.93,0));
+			            brokerlist.put("b1", new Broker(52.51,13.40,1));
+			            brokerlist.put("b2", new Broker(53.06,8.83,2));
+			            brokerlist.put("b3", new Broker(50.11,8.71,3));
+			            brokerlist.put("b4", new Broker(48.16,11.60,4));
+			        	long randomSeed =p;
+			        	Random rand = new Random(randomSeed);
+				        for(int i =0; i<subscriberAmount;i++) {
+				        	randomNSCoord = nsrangeMin + (nsrangeMax - nsrangeMin) * rand.nextDouble();
+				        	randomWECoord = werangeMin + (werangeMax - werangeMin) * rand.nextDouble(); 	
+				        	randomLoad = rand.nextInt(loadMax-loadMin) + loadMin;
+				        	System.out.println(randomLoad);
+				        	String subname = "s"+Integer.toString(i);
+				        	subscriberlist.put(subname,new Subscriber (randomNSCoord,randomWECoord,i,randomLoad));
+				        	Subscriber a = subscriberlist.get(subname);
+				        	
+				        	Broker b  = initialAssignSubscriber(a, brokerlist, brokerid);
+				        	
+				        	brokerid+=1;
+				        	if(brokerid == 5) {
+				        		brokerid =0;
+				        	}
+				        	a.unhappiness = calculateHappiness(a, brokerlist, b);
+				        	System.out.println(a.unhappiness);
+				        	b = b.AssignSubscribertoBroker(a, b);
+				        }
+				        printStats();
+				        checkThresholds();
+				        printStats();
+				        
+				        System.out.println("Starting Simulation...");
+				        while(turn < turnLimit) {
+				        	performActions();
+				        	updateLoadStates();
+				        	System.out.println("Turn : "+ turn);
+				        	//every turn except first
+				        	//increase load of 1/4 of subscribers, which are decreased to their original value 4-6 turns later.
+				        	if(turn > 0 && turn < turnLimit - loadDecreaseTurnMax) {
+				        		increaseDataRates();
+				        	}
+				        	checkThresholds();
+				        	printStats();     	
+				        	try {
+								Thread.sleep(2);
+							} catch (InterruptedException e) {
+								// TODO Auto-generated catch block
+								e.printStackTrace();
+							}
+				        	turn++;
+				        }
+				        dataToCSV(randomSeed);
+				        clearData();
+				        turn = 0;
+			        }
+        		}
+        	}
         }
 	}
 	
