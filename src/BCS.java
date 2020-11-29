@@ -36,9 +36,9 @@ public class BCS {
 		Load;
 	}
 	//-------------CONFIGURATION-------------------------------
-	static InitialDeployment ip;
-	static ShuffleMethod sm;
-	static DMMethod dm;
+	static InitialDeployment ip = InitialDeployment.RND;
+	static ShuffleMethod sm = ShuffleMethod.PRIO;
+	static DMMethod dm = DMMethod.Lat;
 	//min and max values for coordinates, using Germany's max coordinates and Hamburg, Berlin, Frankfurt, München and Göttingen as Broker locations.
 	public static double nsrangeMin = 47;
 	public static double nsrangeMax = 55;
@@ -1084,62 +1084,55 @@ public class BCS {
         double randomWECoord;
         int randomLoad;
         
-        //Create all Subscribers with variable locations
-        for(InitialDeployment ip2 : InitialDeployment.values()) {
-        	ip = ip2;
-        	for(ShuffleMethod sh : ShuffleMethod.values()){
-        		sm = sh;
-        		for(DMMethod dm2: DMMethod.values()) {
-        			dm = dm2;
-        
-			        for(int p = 1;p<101;p++) {
-			        	int brokerid = 0;
-			        	brokerlist.put("b0", new Broker(51.54,9.93,0));
-			            brokerlist.put("b1", new Broker(52.51,13.40,1));
-			            brokerlist.put("b2", new Broker(53.06,8.83,2));
-			            brokerlist.put("b3", new Broker(50.11,8.71,3));
-			            brokerlist.put("b4", new Broker(48.16,11.60,4));
-			        	long randomSeed =p;
-			        	Random rand = new Random(randomSeed);
-				        for(int i =0; i<subscriberAmount;i++) {
-				        	randomNSCoord = nsrangeMin + (nsrangeMax - nsrangeMin) * rand.nextDouble();
-				        	randomWECoord = werangeMin + (werangeMax - werangeMin) * rand.nextDouble(); 	
-				        	randomLoad = rand.nextInt(loadMax-loadMin) + loadMin;
-				        	System.out.println(randomLoad);
-				        	String subname = "s"+Integer.toString(i);
-				        	subscriberlist.put(subname,new Subscriber (randomNSCoord,randomWECoord,i,randomLoad));
-				        	Subscriber a = subscriberlist.get(subname);
-				        	
-				        	Broker b  = initialAssignSubscriber(a, brokerlist, brokerid);
-				        	
-				        	brokerid+=1;
-				        	if(brokerid == 5) {
-				        		brokerid =0;
-				        	}
-				        	a.unhappiness = calculateHappiness(a, brokerlist, b);
-				        	System.out.println(a.unhappiness);
-				        	b = b.AssignSubscribertoBroker(a, b);
-				        }
-				        printStats();
-				        checkThresholds();
-				        printStats();
-				        
-				        System.out.println("Starting Simulation...");
-				        while(turn < turnLimit) {
-				        	performActions();
-				        	updateLoadStates();
-				        	System.out.println("Turn : "+ turn);
-				        	//every turn except first
-				        	//increase load of 1/4 of subscribers, which are decreased to their original value 4-6 turns later.
-				        	if(turn > 0 && turn < turnLimit - loadDecreaseTurnMax) {
-				        		increaseDataRates();
-				        	}
-				        	checkThresholds();
-				        	printStats();     	
-				        	try {
-								Thread.sleep(2);
-							} catch (InterruptedException e) {
-								// TODO Auto-generated catch block
+        //Create all Subscribers with variable locations      
+        for(int p = 1;p<101;p++) {
+        	int brokerid = 0;
+        	brokerlist.put("b0", new Broker(51.54,9.93,0));
+            brokerlist.put("b1", new Broker(52.51,13.40,1));
+            brokerlist.put("b2", new Broker(53.06,8.83,2));
+            brokerlist.put("b3", new Broker(50.11,8.71,3));
+            brokerlist.put("b4", new Broker(48.16,11.60,4));
+        	long randomSeed =p;
+        	Random rand = new Random(randomSeed);
+	        for(int i =0; i<subscriberAmount;i++) {
+	        	randomNSCoord = nsrangeMin + (nsrangeMax - nsrangeMin) * rand.nextDouble();
+	        	randomWECoord = werangeMin + (werangeMax - werangeMin) * rand.nextDouble(); 	
+	        	randomLoad = rand.nextInt(loadMax-loadMin) + loadMin;
+	        	System.out.println(randomLoad);
+	        	String subname = "s"+Integer.toString(i);
+	        	subscriberlist.put(subname,new Subscriber (randomNSCoord,randomWECoord,i,randomLoad));
+	        	Subscriber a = subscriberlist.get(subname);
+	        	
+	        	Broker b  = initialAssignSubscriber(a, brokerlist, brokerid);
+	        	
+	        	brokerid+=1;
+	        	if(brokerid == 5) {
+	        		brokerid =0;
+	        	}
+	        	a.unhappiness = calculateHappiness(a, brokerlist, b);
+	        	System.out.println(a.unhappiness);
+	        	b = b.AssignSubscribertoBroker(a, b);
+	        }
+	        printStats();
+	        checkThresholds();
+	        printStats();
+	        
+	        System.out.println("Starting Simulation...");
+	        while(turn < turnLimit) {
+	        	performActions();
+	        	updateLoadStates();
+	        	System.out.println("Turn : "+ turn);
+	        	//every turn except first
+	        	//increase load of 1/4 of subscribers, which are decreased to their original value 4-6 turns later.
+	        	if(turn > 0 && turn < turnLimit - loadDecreaseTurnMax) {
+	        		increaseDataRates();
+	        	}
+	        	checkThresholds();
+	        	printStats();     	
+	        	try {
+					Thread.sleep(2);
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
 								e.printStackTrace();
 							}
 				        	turn++;
@@ -1149,9 +1142,7 @@ public class BCS {
 				        turn = 0;
 			        }
         		}
-        	}
-        }
-	}
+ 
 	
 	
 	
