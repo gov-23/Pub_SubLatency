@@ -35,7 +35,7 @@ public class BCS {
 		Lat,
 		Load;
 	}
-	//--------------------------------------------
+	//-------------CONFIGURATION-------------------------------
 	static InitialDeployment ip;
 	static ShuffleMethod sm;
 	static DMMethod dm;
@@ -45,9 +45,7 @@ public class BCS {
 	public static double werangeMin = 6;
 	public static double werangeMax = 15;
 	
-	//amount of subscribers and brokers
-	public static int subscriberAmount = 100;
-	public static int brokerAmount = 5;
+
 	
 	//thresholds currently not implemented 
 	public static double latencyShuffleThreshold;
@@ -80,9 +78,7 @@ public class BCS {
     public static int loadMin = 1;
     public static int loadMax = 3;
     
-    //turn and turnlimits
-    public static int turn = 0;
-    public static int turnLimit = 144;
+    
     
     //define when the load increase/decresae can happen at the latest/earliest
     public static int loadDecreaseTurnMin = 4;
@@ -94,13 +90,20 @@ public class BCS {
     public static int thresholdIncrease = 1;
     
     // saves total values for load and total Unhappiness
-    public static double[] unhappinessArray = new double[turnLimit];
-    public static double[] loadArray = new double[turnLimit];
+  
+	//--------END CONFIGURATION--------DO NOT TOUCH--------LOG FILE PATH CHANGE LINE 1059 and 1062--------------------
     
-	//--------------------------------------------
+    //turn and turnlimits
+    public static int turn = 0;
+    public static int turnLimit = 144;
+	//amount of subscribers and brokers
+    public static int subscriberAmount = 100;
+	public static int brokerAmount = 5;
+    
+	public static double[] unhappinessArray = new double[turnLimit];
+	public static double[] loadArray = new double[turnLimit];
+	 
 	
-	//calculate "happiness" according to latency diff to optimal broker
-    //TODO: Rename function and value, unhappiness too unprofessional, bzw. im readme-Datei
 	public static int calculateCollectiveUnhappiness(Broker b, Integer turn) {
 		 int collective = 0;
 		 for (Map.Entry<Integer,Subscriber> entry : b.sub_ids.entrySet()) {
@@ -110,7 +113,7 @@ public class BCS {
 		 b.unhappiness = collective;
 		 return collective;
 	}
-	
+	//calculates total Latency Impact
 	public static int calculateTotalUnhappiness() {
 		 int collective = 0;
 		 for(Map.Entry<String,Broker> entry :brokerlist.entrySet()) {
@@ -121,6 +124,8 @@ public class BCS {
 		 } 
 		 return collective;
 	}
+	
+	//calculates Latency Impact, previously called Happiness.
 	public static int calculateHappiness(Subscriber a, Map<String, Broker> brokerlist, Broker b) {
 		double lat1 = a.nscoord;
 		double lon1 = a.wecoord;
@@ -134,6 +139,7 @@ public class BCS {
 		int smallestLat = distanceToLatency(smallest);
 		return currentMS-smallestLat;
 	}
+	//calculates broker with lowest load
 	public static Broker calculateLowestLoad() {
 		int index = 0;
 		int currentLoadMin = Integer.MAX_VALUE;
@@ -146,6 +152,8 @@ public class BCS {
 		}
 		return brokerlist.get("b"+Integer.toString(index));
 	}
+	
+	//calculates total system load over all brokers
 	public static int calculateTotalLoad() {
 		int totalLoad = 0;
 		for(int i = 0; i < brokerlist.size();i++) {
@@ -154,6 +162,8 @@ public class BCS {
 		}
 		return totalLoad;
 	}
+	
+	//calculates the nearest broker
 	public static Broker calculateNearestBroker(Subscriber a, ArrayList<String> brokersToIgnore) {
 		double lat1 = a.nscoord;
 		double lon1 = a.wecoord;
@@ -220,7 +230,7 @@ public class BCS {
 		}
 		return brokerlist.get("b4");
 	}
-	
+	//gets the smallest load broker and returns it
 	public static Broker calculateSmallestLoadBroker(Subscriber currentSub, ArrayList<String> brokersToIgnore) {
 		int index = 0;
 		int minLoad = Integer.MAX_VALUE;
@@ -235,6 +245,7 @@ public class BCS {
 		}
 		return brokerlist.get("b"+Integer.toString(index));
 	}
+	//takes care of inital broker-subscriber assignment
 	public static Broker initialAssignSubscriber(Subscriber a, Map<String, Broker> brokerlist, int brokerid) {
 		switch(ip) {
 		case RND:
@@ -282,6 +293,7 @@ public class BCS {
 		}
 		return brokerlist.get("b0");
 	}
+	//increases data rates for the randomly chosen subscribers.
 	public static void increaseDataRates() {
 		int subMax = subscriberAmount;
 		int count = 0;
@@ -323,7 +335,8 @@ public class BCS {
 			
 		}
 	}
-	//TODO
+	
+	//Sets up subscriber assignment for main function
 	public static Broker AssignSubscriber(Subscriber a, Map<String, Broker> brokerlist, int brokerid) {
 		switch(ip) {
 		case RND:
@@ -697,12 +710,12 @@ public class BCS {
 		System.out.println("Total Unhappiness across all brokers:: "+calculateTotalUnhappiness());
 	}
 	
-
+	//Performs a theoretical shuffle to see if there's a possible improvement
 	public static boolean performPseudoShuffle() {
 		//implement pseudoshuffle to check if there's an improvement
 		int totalUnhappiness = calculateTotalUnhappiness();
 		unhappinessArray[turn] = totalUnhappiness;
-		System.out.println("Current Happiness: "+ totalUnhappiness);
+		System.out.println("Current Latency Impact: "+ totalUnhappiness);
 		int newUnhappiness = 0;
 		Map<String, Integer> loadstates = new TreeMap<>();
 		for(Map.Entry<String,Broker> entry: brokerlist.entrySet()) {
@@ -795,6 +808,7 @@ public class BCS {
 				count++;
 			}
 			break;
+		//SmLat: Find subscribers who have lowest latency possible in the system. 
 		case SmLat:
 			double[] distances = new double[subscriberlist.size()];
 			//calculate smallest distance for each subscriber to a broker
@@ -837,6 +851,7 @@ public class BCS {
 				}
 				count2++;
 			}
+		//Previous heuristic used by Nguyen et al. 
 		case GreedyShuffle:
 			int[] subLoadStates = new int[subscriberlist.size()];
 			//calculate smallest distance for each subscriber to a broker
@@ -884,7 +899,7 @@ public class BCS {
 			
 		}
 		//if shuffle is better than current configuration by 20%
-		System.out.println("New theoretical Happiness: "+ newUnhappiness);
+		System.out.println("New theoretical Latency Impact: "+ newUnhappiness);
 		if(totalUnhappiness > newUnhappiness) {
 			System.out.println("Shuffle will be performed");
 			performShuffle();
@@ -925,13 +940,14 @@ public class BCS {
 	
 	
 	
-	
+	//performs subscriber actions(movement)
 	public static void performActions() {
 		for(int i = 0;i<subscriberlist.size();i++) {
 			String subscribername = "s" + Integer.toString(i);
 			subscriberlist.get(subscribername).performAction();
 		}
 	}
+	//check all defined thresholds for transfer possibilities
 	public static void checkThresholds() {
 		boolean shuffleHappened = false;
 		shuffleHappened = checkBrokerLatencyShuffleThreshold();
@@ -949,13 +965,13 @@ public class BCS {
 		}
 	}
 	
-	
+	//Prints various information about the broker state and total system load
 	public static void printStats() {
-		System.out.println("B0 Amount of subscribers on Broker :"+brokerlist.get("b0").sub_ids.size()+", Collective Unhappiness : "+calculateCollectiveUnhappiness(brokerlist.get("b0"), turn)+", Collective Load : "+brokerlist.get("b0").load);
-		System.out.println("B1 Amount of subscribers on Broker :"+brokerlist.get("b1").sub_ids.size()+", Collective Unhappiness : "+calculateCollectiveUnhappiness(brokerlist.get("b1"), turn)+", Collective Load : "+brokerlist.get("b1").load);
-		System.out.println("B2 Amount of subscribers on Broker :"+brokerlist.get("b2").sub_ids.size()+", Collective Unhappiness : "+calculateCollectiveUnhappiness(brokerlist.get("b2"), turn)+", Collective Load : "+brokerlist.get("b2").load);
-		System.out.println("B3 Amount of subscribers on Broker :"+brokerlist.get("b3").sub_ids.size()+", Collective Unhappiness : "+calculateCollectiveUnhappiness(brokerlist.get("b3"), turn)+", Collective Load : "+brokerlist.get("b3").load);
-		System.out.println("B4 Amount of subscribers on Broker :"+brokerlist.get("b4").sub_ids.size()+", Collective Unhappiness : "+calculateCollectiveUnhappiness(brokerlist.get("b4"), turn)+", Collective Load : "+brokerlist.get("b4").load);
+		System.out.println("B0 Amount of subscribers on Broker :"+brokerlist.get("b0").sub_ids.size()+", Collective Latency Impact : "+calculateCollectiveUnhappiness(brokerlist.get("b0"), turn)+", Collective Load : "+brokerlist.get("b0").load);
+		System.out.println("B1 Amount of subscribers on Broker :"+brokerlist.get("b1").sub_ids.size()+", Collective Latency Impact : "+calculateCollectiveUnhappiness(brokerlist.get("b1"), turn)+", Collective Load : "+brokerlist.get("b1").load);
+		System.out.println("B2 Amount of subscribers on Broker :"+brokerlist.get("b2").sub_ids.size()+", Collective Latency Impact : "+calculateCollectiveUnhappiness(brokerlist.get("b2"), turn)+", Collective Load : "+brokerlist.get("b2").load);
+		System.out.println("B3 Amount of subscribers on Broker :"+brokerlist.get("b3").sub_ids.size()+", Collective Latency Impact : "+calculateCollectiveUnhappiness(brokerlist.get("b3"), turn)+", Collective Load : "+brokerlist.get("b3").load);
+		System.out.println("B4 Amount of subscribers on Broker :"+brokerlist.get("b4").sub_ids.size()+", Collective Latency Impact : "+calculateCollectiveUnhappiness(brokerlist.get("b4"), turn)+", Collective Load : "+brokerlist.get("b4").load);
 		System.out.println("Total system load: " + calculateTotalLoad());
 		SaveGraphData();
 	}
@@ -974,18 +990,17 @@ public class BCS {
 		}
 		
 	}
-	
+	//used to update load states of subscribers
 	public static void updateLoadStates() {
-		ArrayList<ArrayList<Integer>> updates = new ArrayList<>();
 		if(subscriberLoadChanges.get(turn) != null) {
 			for(ArrayList<Integer> updateAction : subscriberLoadChanges.get(turn)) {
 				Subscriber sub = subscriberlist.get("s"+ Integer.toString(updateAction.get(0)));
 				sub.load += updateAction.get(1);
 				updateBroker(sub.id, sub.load, sub.nscoord, sub.wecoord);
 			}
-		}
-		
+		}	
 	}
+	//updates broker values, so it can track subscriber activity
 	public static void updateBroker(int id, int load, double nscoord, double wecoord) {
 		double [] coords = new double[2];
 		coords[0] = nscoord;
@@ -1006,6 +1021,7 @@ public class BCS {
 			
 		}
 	}
+	//Writes data to arrays, to be exported to csv later
 	public static void writeData(String filePath, int id) 
 	{ 
 	  
@@ -1035,6 +1051,7 @@ public class BCS {
 	        e.printStackTrace(); 
 	    } 
 	} 
+	//writes data to csv files 
 	public static void dataToCSV(long randomSeed) {
 		
 
@@ -1045,7 +1062,7 @@ public class BCS {
 		String filePath = "C:\\Users\\Tim\\eclipse-workspace\\PubSub_Latency\\Logs\\FINALLOW"+ip+"_"+dm+"_"+sm+"Brokers Total_Seed_"+Integer.toString((int)randomSeed)+".csv";
 		writeData(filePath,-1);
 	}
-	
+	//clears data for next simulation run
 	public static void clearData() {
 		unhappinessArray = new double[turnLimit];
 		loadArray = new double[turnLimit];
@@ -1060,6 +1077,7 @@ public class BCS {
 		subscriberLoadChanges.clear();
 		
 	}
+	//main function, runs all simulations with given parameters defined before.
 	public static void main(String[] args) {
         System.out.println("System starting...");
         double randomNSCoord;
