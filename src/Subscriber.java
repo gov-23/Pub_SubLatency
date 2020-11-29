@@ -2,12 +2,15 @@ import java.util.ArrayList;
 import java.util.Random;
 
 public class Subscriber {
+	//CONFIGURATION VALUES
+	String[] actionPossibilities = {"Move", "Move", "Move", "Stand", "Stand", "Stand", "Stand", "Stand", "Stand", "Stand"};
+	//END
 	public static long randomSeed = 12;
 	public static Random rand = new Random(randomSeed);
 	
 	
 	int actionAmount = BCS.turnLimit;
-	String[] actionPossibilities = {"Move", "Move", "Move", "Stand", "Stand", "Stand", "Stand", "Stand", "Stand", "Stand"};
+	
 	double distlimit = 0.20;
 	//double threshold= 80;
 	int[] multiply = {0,1};
@@ -15,12 +18,12 @@ public class Subscriber {
 	double wecoord;
 	int id;
 	int load;
+	//Unhappiness refers to latency impact
 	int unhappiness;
 	int factor;
 	ArrayList<ArrayList<Object>> actions;
+
 	//creates the actions that the subscriber will take 
-	
-	
 	public ArrayList<ArrayList<Object>> generateActions(){
 		ArrayList<ArrayList<Object>> actionArray = new ArrayList<ArrayList<Object>>();
 		for(int i = 0; i<actionAmount;i++) {

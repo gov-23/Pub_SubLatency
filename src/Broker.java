@@ -7,8 +7,10 @@ import java.util.stream.Collectors;
 import javax.swing.text.html.HTMLDocument.Iterator;
 
 public class Broker {
+	//CONFIGURATION VALUES
 	double latPerKM = 0.021048134571484346;
 	int latencyFactor = 2;
+	//END
 	double nscoord;
 	double wecoord;
 	int unhappiness;
@@ -35,7 +37,7 @@ public class Broker {
 		this.sub_load.clear();
 		this.sub_lat.clear();
 		this.sub_loc.clear();
-		this.load = 0;
+		this.load = calculateLoad();
 	}
 	public void removeSubscriber(Integer id) {
 		this.sub_ids.remove(id);
