@@ -44,55 +44,61 @@ public class BCS {
 	public static double nsrangeMax = 55;
 	public static double werangeMin = 6;
 	public static double werangeMax = 15;
-	
-
-	
-	//thresholds currently not implemented 
-	public static double latencyShuffleThreshold;
-	
-	//value provided by J.Hasenburg et. al 
-	public static double latPerKM = 0.021048134571484346;
-	
-	//random seeds used to repeat experiment results
-	public static long randomSeed =1;
-	public static long randomSeed2 = 0;
-	
-	
-	public static Random rand = new Random(randomSeed);
-	public static Random r  = new Random(randomSeed2);
-	//maps used to save all brokers and subscribers
-	public static Map<String, Broker> brokerlist = new TreeMap<String,Broker>();
-    public static Map<String, Subscriber> subscriberlist = new TreeMap<String, Subscriber>();
-    
-    //saves load changes happening to subscribers
-    public static Map<Integer, ArrayList<ArrayList<Integer>>> subscriberLoadChanges = new TreeMap<>();
-    
-    //load limits for DM and SH
+	 //load limits for DM and SH
     public static int dMloadLimit = 75;
     public static int sHloadLimit = 95;
-    
-    
-    public static int totalLoad = 350;
-    
-    //load Max and Min which each subscriber can have at the start of the simulation
-    public static int loadMin = 1;
-    public static int loadMax = 3;
-    
-    
-    
-    //define when the load increase/decresae can happen at the latest/earliest
-    public static int loadDecreaseTurnMin = 4;
-    public static int loadDecreaseTurnMax = 6;
-    public static int loadIncreaseTurnMin = 1;
-    public static int loadIncreaseTurnMax = 3;
-    
-    //defines how much the threshold should increase by if a LatDM fails
-    public static int thresholdIncrease = 1;
-    
-    // saves total values for load and total Unhappiness
+	
+    //Random seed to configure a specific seed to run under configuration options listed above.
+  	public static long randomSeed =1;
+	
   
 	//--------END CONFIGURATION--------DO NOT TOUCH--------LOG FILE PATH CHANGE LINE 1059 and 1062--------------------
     
+	
+
+		
+		//thresholds currently not implemented 
+		public static double latencyShuffleThreshold;
+		
+		//value provided by J.Hasenburg et. al 
+		public static double latPerKM = 0.021048134571484346;
+		
+		//random seeds used to repeat experiment results
+		public static long randomSeed2 = 0;
+		
+		
+		public static Random rand = new Random(randomSeed);
+		public static Random r  = new Random(randomSeed2);
+		//maps used to save all brokers and subscribers
+		public static Map<String, Broker> brokerlist = new TreeMap<String,Broker>();
+	    public static Map<String, Subscriber> subscriberlist = new TreeMap<String, Subscriber>();
+	    
+	    //saves load changes happening to subscribers
+	    public static Map<Integer, ArrayList<ArrayList<Integer>>> subscriberLoadChanges = new TreeMap<>();
+	    
+	   
+	    
+	    
+	    public static int totalLoad = 350;
+	    
+	    //load Max and Min which each subscriber can have at the start of the simulation
+	    public static int loadMin = 1;
+	    public static int loadMax = 3;
+	    
+	    
+	    
+	    //define when the load increase/decresae can happen at the latest/earliest
+	    public static int loadDecreaseTurnMin = 4;
+	    public static int loadDecreaseTurnMax = 6;
+	    public static int loadIncreaseTurnMin = 1;
+	    public static int loadIncreaseTurnMax = 3;
+	    
+	    //defines how much the threshold should increase by if a LatDM fails
+	    public static int thresholdIncrease = 1;
+	    
+	    // saves total values for load and total Unhappiness
+	
+	
     //turn and turnlimits
     public static int turn = 0;
     public static int turnLimit = 144;
@@ -1085,63 +1091,59 @@ public class BCS {
         int randomLoad;
         
         //Create all Subscribers with variable locations      
-        for(int p = 1;p<101;p++) {
-        	int brokerid = 0;
-        	brokerlist.put("b0", new Broker(51.54,9.93,0));
-            brokerlist.put("b1", new Broker(52.51,13.40,1));
-            brokerlist.put("b2", new Broker(53.06,8.83,2));
-            brokerlist.put("b3", new Broker(50.11,8.71,3));
-            brokerlist.put("b4", new Broker(48.16,11.60,4));
-        	long randomSeed =p;
-        	Random rand = new Random(randomSeed);
-	        for(int i =0; i<subscriberAmount;i++) {
-	        	randomNSCoord = nsrangeMin + (nsrangeMax - nsrangeMin) * rand.nextDouble();
-	        	randomWECoord = werangeMin + (werangeMax - werangeMin) * rand.nextDouble(); 	
-	        	randomLoad = rand.nextInt(loadMax-loadMin) + loadMin;
-	        	System.out.println(randomLoad);
-	        	String subname = "s"+Integer.toString(i);
-	        	subscriberlist.put(subname,new Subscriber (randomNSCoord,randomWECoord,i,randomLoad));
-	        	Subscriber a = subscriberlist.get(subname);
-	        	
-	        	Broker b  = initialAssignSubscriber(a, brokerlist, brokerid);
-	        	
-	        	brokerid+=1;
-	        	if(brokerid == 5) {
-	        		brokerid =0;
-	        	}
-	        	a.unhappiness = calculateHappiness(a, brokerlist, b);
-	        	System.out.println(a.unhappiness);
-	        	b = b.AssignSubscribertoBroker(a, b);
-	        }
-	        printStats();
-	        checkThresholds();
-	        printStats();
-	        
-	        System.out.println("Starting Simulation...");
-	        while(turn < turnLimit) {
-	        	performActions();
-	        	updateLoadStates();
-	        	System.out.println("Turn : "+ turn);
-	        	//every turn except first
-	        	//increase load of 1/4 of subscribers, which are decreased to their original value 4-6 turns later.
-	        	if(turn > 0 && turn < turnLimit - loadDecreaseTurnMax) {
-	        		increaseDataRates();
-	        	}
-	        	checkThresholds();
-	        	printStats();     	
-	        	try {
-					Thread.sleep(2);
-				} catch (InterruptedException e) {
-					// TODO Auto-generated catch block
-								e.printStackTrace();
-							}
-				        	turn++;
-				        }
-				        dataToCSV(randomSeed);
-				        clearData();
-				        turn = 0;
+    	int brokerid = 0;
+    	brokerlist.put("b0", new Broker(51.54,9.93,0));
+        brokerlist.put("b1", new Broker(52.51,13.40,1));
+        brokerlist.put("b2", new Broker(53.06,8.83,2));
+        brokerlist.put("b3", new Broker(50.11,8.71,3));
+        brokerlist.put("b4", new Broker(48.16,11.60,4));
+        for(int i =0; i<subscriberAmount;i++) {
+        	randomNSCoord = nsrangeMin + (nsrangeMax - nsrangeMin) * rand.nextDouble();
+        	randomWECoord = werangeMin + (werangeMax - werangeMin) * rand.nextDouble(); 	
+        	randomLoad = rand.nextInt(loadMax-loadMin) + loadMin;
+        	System.out.println(randomLoad);
+        	String subname = "s"+Integer.toString(i);
+        	subscriberlist.put(subname,new Subscriber (randomNSCoord,randomWECoord,i,randomLoad));
+        	Subscriber a = subscriberlist.get(subname);
+        	
+        	Broker b  = initialAssignSubscriber(a, brokerlist, brokerid);
+        	
+        	brokerid+=1;
+        	if(brokerid == 5) {
+        		brokerid =0;
+        	}
+        	a.unhappiness = calculateHappiness(a, brokerlist, b);
+        	System.out.println(a.unhappiness);
+        	b = b.AssignSubscribertoBroker(a, b);
+        }
+        printStats();
+        checkThresholds();
+        printStats();
+        
+        System.out.println("Starting Simulation...");
+        while(turn < turnLimit) {
+        	performActions();
+        	updateLoadStates();
+        	System.out.println("Turn : "+ turn);
+        	//every turn except first
+        	//increase load of 1/4 of subscribers, which are decreased to their original value 4-6 turns later.
+        	if(turn > 0 && turn < turnLimit - loadDecreaseTurnMax) {
+        		increaseDataRates();
+        	}
+        	checkThresholds();
+        	printStats();     	
+        	try {
+				Thread.sleep(2);
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+			        	turn++;
 			        }
-        		}
+			        dataToCSV(randomSeed);
+			        clearData();
+			        turn = 0;
+		 }
  
 	
 	
