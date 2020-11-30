@@ -51,7 +51,9 @@ public class BCS {
     //Random seed to configure a specific seed to run under configuration options listed above.
   	public static long randomSeed =1;
 	
-  
+  	//defines how much the threshold should increase by if a LatDM fails
+    public static int thresholdIncrease = 1;
+    
 	//--------END CONFIGURATION--------DO NOT TOUCH--------LOG FILE PATH CHANGE LINE 1059 and 1062--------------------
     
 	
@@ -93,8 +95,6 @@ public class BCS {
 	    public static int loadIncreaseTurnMin = 1;
 	    public static int loadIncreaseTurnMax = 3;
 	    
-	    //defines how much the threshold should increase by if a LatDM fails
-	    public static int thresholdIncrease = 1;
 	    
 	    // saves total values for load and total Unhappiness
 	
