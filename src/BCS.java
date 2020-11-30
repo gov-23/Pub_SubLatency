@@ -35,7 +35,7 @@ public class BCS {
 		Lat,
 		Load;
 	}
-	//-------------CONFIGURATION-------------------------------
+	//-------------CONFIGURATION, DONT FORGET LOG FILE CHANGE AROUND LINE 1051 and 1054-------------------------------
 	static InitialDeployment ip;
 	static ShuffleMethod sm;
 	static DMMethod dm;
@@ -44,55 +44,47 @@ public class BCS {
 	public static double nsrangeMax = 55;
 	public static double werangeMin = 6;
 	public static double werangeMax = 15;
-	
-
-	
-	//thresholds currently not implemented 
-	public static double latencyShuffleThreshold;
-	
-	//value provided by J.Hasenburg et. al 
-	public static double latPerKM = 0.021048134571484346;
-	
-	//random seeds used to repeat experiment results
-	public static long randomSeed =1;
-	public static long randomSeed2 = 0;
-	
-	
-	public static Random rand = new Random(randomSeed);
-	public static Random r  = new Random(randomSeed2);
-	//maps used to save all brokers and subscribers
-	public static Map<String, Broker> brokerlist = new TreeMap<String,Broker>();
-    public static Map<String, Subscriber> subscriberlist = new TreeMap<String, Subscriber>();
-    
-    //saves load changes happening to subscribers
-    public static Map<Integer, ArrayList<ArrayList<Integer>>> subscriberLoadChanges = new TreeMap<>();
-    
-    //load limits for DM and SH
+	//load limits for DM and SH
     public static int dMloadLimit = 75;
     public static int sHloadLimit = 95;
-    
-    
-    public static int totalLoad = 350;
-    
     //load Max and Min which each subscriber can have at the start of the simulation
     public static int loadMin = 1;
     public static int loadMax = 3;
+	//--------END CONFIGURATION--------DO NOT TOUCH--------LOG FILE PATH CHANGE LINE 1051 and 1054--------------------
     
     
     
-    //define when the load increase/decresae can happen at the latest/earliest
-    public static int loadDecreaseTurnMin = 4;
-    public static int loadDecreaseTurnMax = 6;
-    public static int loadIncreaseTurnMin = 1;
-    public static int loadIncreaseTurnMax = 3;
-    
-    //defines how much the threshold should increase by if a LatDM fails
-    public static int thresholdIncrease = 1;
-    
-    // saves total values for load and total Unhappiness
-  
-	//--------END CONFIGURATION--------DO NOT TOUCH--------LOG FILE PATH CHANGE LINE 1059 and 1062--------------------
-    
+  	//value provided by J.Hasenburg et. al 
+  	public static double latPerKM = 0.021048134571484346;
+  	
+  	//random seeds used to repeat experiment results
+  	public static long randomSeed;
+  	public static long randomSeed2 = 0;
+  	
+  	public static Random rand = new Random(randomSeed);
+  	public static Random r  = new Random(randomSeed2);
+  	//maps used to save all brokers and subscribers
+  	public static Map<String, Broker> brokerlist = new TreeMap<String,Broker>();
+  	public static Map<String, Subscriber> subscriberlist = new TreeMap<String, Subscriber>();
+      
+    //saves load changes happening to subscribers
+    public static Map<Integer, ArrayList<ArrayList<Integer>>> subscriberLoadChanges = new TreeMap<>();
+      
+      
+      
+      
+      
+      
+      //define when the load increase/decresae can happen at the latest/earliest
+      public static int loadDecreaseTurnMin = 4;
+      public static int loadDecreaseTurnMax = 6;
+      public static int loadIncreaseTurnMin = 1;
+      public static int loadIncreaseTurnMax = 3;
+      
+      //defines how much the threshold should increase by if a LatDM fails
+      public static int thresholdIncrease = 1;
+      
+      // saves total values for load and total Unhappiness
     //turn and turnlimits
     public static int turn = 0;
     public static int turnLimit = 144;
