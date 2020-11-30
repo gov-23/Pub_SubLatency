@@ -50,6 +50,8 @@ public class BCS {
     //load Max and Min which each subscriber can have at the start of the simulation
     public static int loadMin = 1;
     public static int loadMax = 3;
+    //defines how much the threshold should increase by if a LatDM fails
+    public static int thresholdIncrease = 1;
 	//--------END CONFIGURATION--------DO NOT TOUCH--------LOG FILE PATH CHANGE LINE 1051 and 1054--------------------
     
     
@@ -81,8 +83,7 @@ public class BCS {
       public static int loadIncreaseTurnMin = 1;
       public static int loadIncreaseTurnMax = 3;
       
-      //defines how much the threshold should increase by if a LatDM fails
-      public static int thresholdIncrease = 1;
+      
       
       // saves total values for load and total Unhappiness
     //turn and turnlimits
